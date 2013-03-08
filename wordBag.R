@@ -27,12 +27,11 @@ wordBag <- function(input, bagName){
   terms <- TermDocumentMatrix(bagOfHolding)
   matrixTerms <- as.matrix(terms)
   matrixTerms <- rowSums(matrixTerms[,-1])
-  print(matrixTerms)
   return(matrixTerms)
   
 }#end of wordbag
 
-#makes a wordbag
+#makes a text file for wordbagging
 makeTextFile <- function(input, textFile){
 
   library("tm")
