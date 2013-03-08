@@ -8,4 +8,4 @@
 	A changeLog
 	* lojack.R is for handling location data in separate sources
 	* wordBag.R is for the word bag and wordbag type analysis
-	
+	* moved data files to data folder
