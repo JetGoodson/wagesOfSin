@@ -1,0 +1,11 @@
+3/7/2013 Jet Goodson <jetgoodson@gmail.com>
+	A wagesOfSin.R
+	A lojack.R
+	A wordBag.R
+	A STRATEGI_2010_GAZETTEER.txt 
+	A toolBox.R
+	A Location_Tree.csv
+	A changeLog
+	* lojack.R is for handling location data in separate sources
+	* wordBag.R is for the word bag and wordbag type analysis
+	
