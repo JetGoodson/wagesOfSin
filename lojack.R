@@ -38,25 +38,25 @@ lojack <- function() {
 createCoordinateTable <- function() {
 coordTable <- read.table("STRATEGI_2010_GAZETTEER.TXT", header=FALSE, sep="*", quote="", stringsAsFactors=FALSE)
 cat("Saving coordinate table\n")
-save(coordTable, file="coordinateTable.rda")
+save(coordTable, file="data/coordinateTable.rda")
 #table gives place name, county, and northing and easting
 return(coordTable)
 }#end of createCoordinateTable
 
 #create lookup table for location texts
 createLocationTable <- function() {
-locationTable <- read.table("Location_Tree.csv", header=FALSE, sep="~", quote="", stringsAsFactors=FALSE,fill=TRUE)
+locationTable <- read.table("data/Location_Tree.csv", header=FALSE, sep="~", quote="", stringsAsFactors=FALSE,fill=TRUE)
 locationTable$V1 <- gsub('"', "", locationTable$V1)
 locationTable$V4 <- gsub('"', "", locationTable$V4)
 cat("Saving location table\n")
-save(locationTable, file="locationTable.rda")
+save(locationTable, file="data/locationTable.rda")
 return(locationTable)
 }#end of createLocationTable
 
 
 coordinateCheck <- function(input) {
 
-  load("coordinateTable.rda")
+  load("data/coordinateTable.rda")
   name <- ""
   j <- ncol(input)
   name <- input[,j]

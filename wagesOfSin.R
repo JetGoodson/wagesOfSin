@@ -18,7 +18,7 @@ wagesOfSin <- function() {
   ###################################################### end config
 
   if(loadSavedTrainData == FALSE) {
-    trainFrame <- read.csv("Train_rev1.csv", header=TRUE,skip=0,stringsAsFactors=FALSE)
+    trainFrame <- read.csv("data/Train_rev1.csv", header=TRUE,skip=0,stringsAsFactors=FALSE)
     trainFrame <- trainFrame[,!(colnames(trainFrame) %in% c("Id", "Title", "SalaryRaw", "LocationRaw","SourceName"))] #not keen on these right now, maybe later
     trainFrame <- trainFrame[1:100,]   #only select  100 for now
 
@@ -28,12 +28,12 @@ wagesOfSin <- function() {
 #trainFrame$FullDescription <- gsub("(http://|)(www\\.)?([^\\.]+)\\.(\\w{2}|(com|net|org|edu|int|mil|gov|arpa|biz|aero|name|coop|info|pro|museum|co.uk))$", "", trainFrame$FullDescription)
 #(http://|)(www\.)?([^\.]+)\.(\w{2}|(com|net|org|edu|int|mil|gov|arpa|biz|aero|name|coop|info|pro|museum))$
     
-    save(trainFrame, file="table_train.rda")   #save so we can use the smaller version
+    save(trainFrame, file="data/table_train.rda")   #save so we can use the smaller version
     cat("Saved training data as R-object\n")    
   }
   if(loadSavedTrainData == TRUE) {   #load the saved bit
     cat("Loading:\n")
-    print(load("table_train.rda"))
+    print(load("data/table_train.rda"))
     cat("Loaded\n")
   }
 
