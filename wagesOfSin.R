@@ -25,7 +25,7 @@ wagesOfSin <- function() {
     trainFrame <-cbind(trainFrame$SalaryNormalized, trainFrame[,!(colnames(trainFrame) %in% c("SalaryNormalized"))]) 
     
     trainFrame <- transmogrifyFrame(trainFrame)
-
+    print(head(trainFrame))
     
     save(trainFrame, file="data/table_train.rda")   #save so we can use the smaller version
     cat("Saved training data as R-object\n")    

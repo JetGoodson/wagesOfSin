@@ -1,6 +1,12 @@
-3/8/2013 Katie Malone <cmmalone.158@gmail.com>
+3/14/2013 Jet Goodson <jetgoodson CHEZ gmail.com>
+	M changeLog
+	- got rid of  @s since the git repo is public to spam spiders
+        M toolBox.R
+	* changed, updated, and expanded text cleaning
+	
+3/8/2013 Katie Malone <cmmalone.158 CHEZ gmail.com>
     - cloned directory and tried test push
-3/7/2013 Jet Goodson <jetgoodson@gmail.com>
+3/7/2013 Jet Goodson <jetgoodson CHEZ gmail.com>
 	A wagesOfSin.R
 	A lojack.R
 	A wordBag.R

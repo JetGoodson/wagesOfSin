@@ -10,88 +10,220 @@
 #simplify and manipulate the fields
 transmogrifyFrame <- function(dataFrame) {
 
-  source("wordBag.R")
-  
   library(plyr)
   library(tm)
   library(Snowball)
   require(stringr)
   stopWords <- stopwords("en")
   class(stopWords)
-
+  
   load(file="data/locationWordBag.rda")#gives locWords
+
+  #commented out, lets let frequency count handle this
+ # redundantWordBag <- getWordList(dataFrame$Category, c("&", "Jobs", "/", "  "), c("", "", " ", " ")) #this must be before next line to be useful
+ # redundantWordBag <- c(redundantWordBag, "permanent", "full", "part", "time", "contract", "engineer", "financial", "recruiter", "teacher")
+  redundantWordBag <- c("contract", "permanent", "part", "full", "time")
+  dataFrame$Category <- transmogrifyCategory(dataFrame$Category)
+  #want to remove accounting, nursing from list
+
+  ###do location generalized
+  dataFrame$LocationNormalized <- locateThis(dataFrame$LocationNormalized)
+
+  #better column names
+  dataFrame$ContractType <- gsub("part_time" , "partTimer", dataFrame$ContractType)   
+  dataFrame$ContractType <- gsub("full_time" , "fullTimer", dataFrame$ContractType)
+ 
+  #leave as words the ContractTime column
+ 
+  dataFrame$Title <- textCleanup(dataFrame$Title, c(stopWords, locWords, redundantWordBag))
+  dataFrame$FullDescription <- textCleanup(dataFrame$FullDescription, c(stopWords, locWords, redundantWordBag))
+
+  dataFrame$Company <- killPunkSpaces(dataFrame$Company)
+  dataFrame$SourceName <- killPunkSpaces(dataFrame$SourceName)
   
-  dataFrame$FullDescription <- paste(dataFrame$FullDescription, dataFrame$Title, sep=" ") #add title to fulldescription
-  dataFrame$FullDescription <- tolower(dataFrame$FullDescription)   #make it lower case
+  colnames(dataFrame)[1] <- "SalaryNormalized" #seems to get messed up
+  return(dataFrame)
+ 
+}#end of transmogrify
+
+#getCategories - word bag the categories
+getWordList <- function(column, find = c(""), replace = c("")){
+  if(length(find) > 0 && length(find) == length(replace)){
+    for(i in 1:length(find)) {
+      column <- gsub(find[i], replace[i], column)
+    } 
+                                        #  column <- gsub("Jobs", "", column)
+                                        #  column <- gsub("&", "", column)
+                                        #  column <- gsub("/", " ", column)
+                                        #  column <- gsub("  ", " ", column)
+  }
+  if(length(find) != length(replace)){
+    cat("Find and replace lengths do not match\n")
+  }
+  column <- gsub("Nursing", "other", column) #for later redundancy, want to distinguish accountants from financiers, nurses from doctors
+  column <- gsub("Accounting", "other", column)
+  wordList <- tolower(unique(unlist(strsplit(column, " "))))
+  return(wordList)
+} #end of getCategories
+
+
+
+#specifically alters 
+transmogrifyCategory <- function(column) {
+  #I'm turning this into [hopefully] unique identifiers that will make good feature names in columns. And being smartassed.
+  column <- gsub("Accounting & Finance Jobs", "fatCats", column)   #this changes this column to a number for each category
+  column <- gsub("Admin Jobs", "theMan", column)
+  column <- gsub("Charity & Voluntary Jobs", "bleedingHearts", column)
+  column <- gsub("Consultancy Jobs", "hiredGuns", column)
+  column <- gsub("Creative & Design Jobs", "starvingArtists", column)
+  column <- gsub("Customer Services Jobs", "helpDesk", column)
+  column <- gsub("Domestic Help & Cleaning Jobs", "chamberMaids", column)
+  column <- gsub("Energy, Oil & Gas Jobs", "goJuice", column)
+  column <- gsub("Engineering Jobs", "beamMeUpScotty", column)
+  column <- gsub("Graduate Jobs", "poorBastards", column)
+  column <- gsub("Healthcare & Nursing Jobs", "bonesMcCoy", column)
+  column <- gsub("Hospitality & Catering Jobs", "normanBates", column)
+  column <- gsub("HR & Recruitment Jobs", "headHunters", column)
+  column <- gsub("IT Jobs", "nerdHerd", column)
+  column <- gsub("Legal Jobs", "legalEagles", column)
+  column <- gsub("Logistics & Warehouse Jobs", "inTheRearWithTheGear", column)
+  column <- gsub("Maintenance Jobs", "mrFixit", column)
+  column <- gsub("Manufacturing Jobs", "assemblyLine", column)
+  column <- gsub("Other/General Jobs", "oddJob", column)
+  column <- gsub("PR, Advertising & Marketing Jobs", "prFlacks", column)
+  column <- gsub("Property Jobs", "groundkeeperWillie", column)
+  column <- gsub("Retail Jobs", "poshShopGirl", column)
+  column <- gsub("Sales Jobs", "usedCarSalesmen", column)
+  column <- gsub("Scientific & QA Jobs", "madScientists", column)
+  column <- gsub("Social Work Jobs", "busyBodies", column)
+  column <- gsub("Teaching Jobs", "glorifiedBabysitters", column)
+  column <- gsub("Trade & Construction Jobs", "doozers", column)
+  column <- gsub("Travel Jobs" , "leavinOnAJetPlane", column)
+  return(column)
+}#end of transmogrifyCategory
+
+
+
+#takes location to the second column to minimize features, should be about 30
+locateThis <- function(column) {
+  load(file="data/locationTable.rda")#gives locWords
+  column <- sapply(column, function(x){
+    newLoc <- which(locationTable$V4 == x)
+    if(length(newLoc) == 0){
+      newLoc <- which(locationTable$V3 == x)
+      if(length(newLoc) == 0){
+        newLoc <- x 
+      }}
+    if(length(newLoc) > 0){
+     newLoc <- locationTable[newLoc[1], 2] 
+    }
+    #newLoc <- tolower(newLoc)
+    newLoc <- strsplit(newLoc, " ")[[1]]
+    newLoc <- paste(toupper(substring(newLoc, 1, 1)), substring(newLoc, 2), collapse = "")
+  })
+  column <- gsub("/" , "", column)
+  column <- gsub(" " , "", column)
+  column <- gsub("&" , "", column)
+  column <- gsub("uk" , "", column) #duh. If there are any ads outside UK, this field won't tell us
+  return(column) 
+} #end of locateThis
+
+
+#kill punctuation and spaces
+killPunkSpaces <- function(column) {
+  column <- gsub("[[:punct:]]", " ", column)  #kill punctuation, do before following to preserve urls in sourcename
+  column <- sapply(column, function(x){
+    t <- strsplit(x, " ")[[1]]
+    t <- paste(toupper(substring(t, 1, 1)), substring(t, 2), sep = "", collapse = "")
+  })
+  column <- gsub("/\\s/", "", column) #strip excess white space
+}#end of killPunkSpaces
+
+
+#removes words from column that appear in other category, i.e. locations and job categories
+wordRemover <- function(column, wordList) {
+  '%nin%' <- Negate('%in%')
+  column <- lapply(column, function(x) {   
+    t <- unlist(strsplit(x, " "))
+    t <- t[t %nin% wordList] ##this gets rid of stopwords i.e., common words like article, simple verbs
+    t <- paste(t, sep=" ", collapse= " ") 
+  })
+  return(column)
+}#end of word remover
+
+
+#do all the things to the free text in title and fulldescription, saved from how it was around March 10th, 2013 for reference
+textCleanup <- function(column, killWords = c("")) {
+  source("wordBag.R")
   
-  dataFrame$FullDescription <- gsub("[_,\\*]", "", dataFrame$FullDescription)  ##get rid of where they replaced salaries with asterisks.
-  #below gets rid of websites, which I don't think we need to keep, they mess things up
-  dataFrame$FullDescription <- gsub("(((file|gopher|news|nntp|telnet|http|ftp|https|ftps|sftp)://)|(www\\.))+(([a-zA-Z0-9\\._-]+\\.[a-zA-Z]{2,6})|([0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}))(/[a-zA-Z0-9\\&amp;%_\\./-~-]*)?", "", dataFrame$FullDescription)
-  dataFrame$FullDescription <- gsub("^.*(.com|.co.uk).*$", "", dataFrame$FullDescription)   #destroy british websites
-  dataFrame$FullDescription <- gsub("/", " ", dataFrame$FullDescription)    #get rid of slashes, confuses things
-  dataFrame$FullDescription <- gsub("\\.", " ", dataFrame$FullDescription)  #get rid of periods
+  library(plyr)
+  library(tm)
+  library(Snowball)
+  require(stringr)
+  
+  column <- tolower(column)   #make it lower case
+  
+  column <- gsub("[_,\\*]", "", column)  ##get rid of where they replaced salaries with asterisks.
+                                        #below gets rid of websites, which I don't think we need to keep, they mess things up
+  column <- gsub("(((file|gopher|news|nntp|telnet|http|ftp|https|ftps|sftp)://)|(www\\.))+(([a-zA-Z0-9\\._-]+\\.[a-zA-Z]{2,6})|([0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}))(/[a-zA-Z0-9\\&amp;%_\\./-~-]*)?", "", column)
+  column <- gsub("^.*(.com|.co.uk).*$", "", column)   #destroy british websites
+  column <- gsub("/", " ", column)    #get rid of slashes, confuses things
+  column <- gsub("\\.", " ", column)  #get rid of periods
   
   
   '%nin%' <- Negate('%in%')
-  dataFrame$FullDescription <- lapply(dataFrame$FullDescription, function(x) {   
+  column <- lapply(column, function(x) {   
     t <- unlist(strsplit(x, " "))
-    t <- t[t %nin% stopWords] ##this gets rid of stopwords i.e., common words like article, simple verbs
-    t <- t[t %nin% locWords]#this gets rid of locations
+    #  t <- t[t %nin% stopWords] ##this gets rid of stopwords i.e., common words like article, simple verbs
+    t <- t[t %nin% killWords]#this gets rid of locations
     t <- SnowballStemmer(t)
     t <- paste(t, sep=" ", collapse= " ") 
   })
+
+  column <- gsub("[[:punct:]]", " ", column)  #kill punctuation, do before following to preserve urls in sourcename
+  column <- gsub("\\d", " ", column)  #get rid of digits
+  column <- gsub("/\\s\\s+/", " ", column) #strip excess white space
+  column <- str_trim(column)
+  
+  return(column)
+}
+
+#do all the things to the free text in title and fulldescription, saved from how it was around March 10th, 2013 for reference
+###originalFreeTextHandler #<- function(frame) {
+
+#  frame$FullDescription <- paste(frame$FullDescription, frame$Title, sep=" ") #add title to fulldescription
+#  frame$FullDescription <- tolower(frame$FullDescription)   #make it lower case
+  
+ # frame$FullDescription <- gsub("[_,\\*]", "", frame$FullDescription)  ##get rid of where they replaced salaries with asterisks.
+  #below gets rid of websites, which I don't think we need to keep, they mess things up
+ # frame$FullDescription <- gsub("(((file|gopher|news|nntp|telnet|http|ftp|https|ftps|sftp)://)|(www\\.))+(([a-zA-Z0-9\\._-]+\\.[a-zA-Z]{2,6})|([0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}))(/[a-zA-Z0-9\\&amp;%_\\./-~-]*)?", "", frame$FullDescription)
+  #frame$FullDescription <- gsub("^.*(.com|.co.uk).*$", "", frame$FullDescription)   #destroy british websites
+  #frame$FullDescription <- gsub("/", " ", frame$FullDescription)    #get rid of slashes, confuses things
+  #frame$FullDescription <- gsub("\\.", " ", frame$FullDescription)  #get rid of periods
+  
+  
+  #'%nin%' <- Negate('%in%')
+  #frame$FullDescription <- lapply(frame$FullDescription, function(x) {   
+  #  t <- unlist(strsplit(x, " "))
+  #  t <- t[t %nin% stopWords] ##this gets rid of stopwords i.e., common words like article, simple verbs
+  #  t <- t[t %nin% locWords]#this gets rid of locations
+  #  t <- SnowballStemmer(t)
+  #  t <- paste(t, sep=" ", collapse= " ") 
+  #})
 
   ##Just stem with tm_map tool in lapply? Maybe even do same lapply
   ##bagOfHolding <- tm_map(bagOfHolding, stemDocument, language = "english")
 
   
-  dataFrame$FullDescription <- gsub("[[:punct:]]", " ", dataFrame$FullDescription)  #kill punctuation, do before following to preserve urls in sourcename
+  #frame$FullDescription <- gsub("[[:punct:]]", " ", frame$FullDescription)  #kill punctuation, do before following to preserve urls in sourcename
   
   
-  dataFrame$FullDescription <- paste(dataFrame$FullDescription, tolower(dataFrame$Company), tolower(dataFrame$SourceName), sep=" ")  #merge text  fields into 1
-  dataFrame <- dataFrame[,!(colnames(dataFrame) %in% c("Title", "Company","SourceName"))]   #get rid of extra columns
-  
-  
-  dataFrame$FullDescription <- gsub("\\d", " ", dataFrame$FullDescription)  #get rid of digits
-  dataFrame$FullDescription <- gsub("/\\s\\s+/", " ", dataFrame$FullDescription) #strip excess white space
-  dataFrame$FullDescription <- str_trim(dataFrame$FullDescription)
-  
-  
-  dataFrame$Category <- gsub("Accounting & Finance Jobs", "1", dataFrame$Category)   #this changes this column to a number for each category
-  dataFrame$Category <- gsub("Admin Jobs", "2", dataFrame$Category)
-  dataFrame$Category <- gsub("Charity & Voluntary Jobs", "3", dataFrame$Category)
-  dataFrame$Category <- gsub("Consultancy Jobs", "4", dataFrame$Category)
-  dataFrame$Category <- gsub("Creative & Design Jobs", "5", dataFrame$Category)
-  dataFrame$Category <- gsub("Customer Services Jobs", "6", dataFrame$Category)
-  dataFrame$Category <- gsub("Domestic Help & Cleaning Jobs", "7", dataFrame$Category)
-  dataFrame$Category <- gsub("Energy, Oil & Gas Jobs", "8", dataFrame$Category)
-  dataFrame$Category <- gsub("Engineering Jobs", "9", dataFrame$Category)
-  dataFrame$Category <- gsub("Graduate Jobs", "10", dataFrame$Category)
-  dataFrame$Category <- gsub("Healthcare & Nursing Jobs", "11", dataFrame$Category)
-  dataFrame$Category <- gsub("Hospitality & Catering Jobs", "12", dataFrame$Category)
-  dataFrame$Category <- gsub("HR & Recruitment Jobs", "13", dataFrame$Category)
-  dataFrame$Category <- gsub("IT Jobs", "14", dataFrame$Category)
-  dataFrame$Category <- gsub("Legal Jobs", "15", dataFrame$Category)
-  dataFrame$Category <- gsub("Logistics & Warehouse Jobs", "16", dataFrame$Category)
-  dataFrame$Category <- gsub("Maintenance Jobs", "17", dataFrame$Category)
-  dataFrame$Category <- gsub("Manufacturing Jobs", "18", dataFrame$Category)
-  dataFrame$Category <- gsub("Other/General Jobs", "19", dataFrame$Category)
-  dataFrame$Category <- gsub("PR, Advertising & Marketing Jobs", "20", dataFrame$Category)
-  dataFrame$Category <- gsub("Property Jobs", "21", dataFrame$Category)
-  dataFrame$Category <- gsub("Retail Jobs", "22", dataFrame$Category)
-  dataFrame$Category <- gsub("Sales Jobs", "23", dataFrame$Category)
-  dataFrame$Category <- gsub("Scientific & QA Jobs", "24", dataFrame$Category)
-  dataFrame$Category <- gsub("Social Work Jobs", "25", dataFrame$Category)
-  dataFrame$Category <- gsub("Teaching Jobs", "26", dataFrame$Category)
-  dataFrame$Category <- gsub("Trade & Construction Jobs", "27", dataFrame$Category)
-  dataFrame$Category <- gsub("Travel Jobs" , "28", dataFrame$Category)
-  
-   dataFrame$ContractTime <- gsub("contract" , "1", dataFrame$ContractTime)    #change to numbers
-  dataFrame$ContractTime <- gsub("permanent" , "2", dataFrame$ContractTime)
-  
- dataFrame$ContractType <- gsub("part_time" , "2", dataFrame$ContractType)   #change to numbers
-  dataFrame$ContractType <- gsub("full_time" , "2", dataFrame$ContractType)
-  
-  
-  return(dataFrame)
-}#end of transmogrify
+  #frame$FullDescription <- paste(frame$FullDescription, tolower(frame$Company), tolower(frame$SourceName), sep=" ")  #merge text  fields into 1
+  #frame <- frame[,!(colnames(frame) %in% c("Title", "Company","SourceName"))]   #get rid of extra columns
+   
+  #frame$FullDescription <- gsub("\\d", " ", frame$FullDescription)  #get rid of digits
+  #frame$FullDescription <- gsub("/\\s\\s+/", " ", frame$FullDescription) #strip excess white space
+  #frame$FullDescription <- str_trim(frame$FullDescription)
+ 
+  #return(frame
+#}#end of freeTextHandler

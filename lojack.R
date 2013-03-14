@@ -88,7 +88,11 @@ return(coordTable)
 createLocationTable <- function() {
 locationTable <- read.table("data/Location_Tree.csv", header=FALSE, sep="~", quote="", stringsAsFactors=FALSE,fill=TRUE)
 locationTable$V1 <- gsub('"', "", locationTable$V1)
+locationTable$V2 <- gsub('"', "", locationTable$V2)
+locationTable$V3 <- gsub('"', "", locationTable$V3)
 locationTable$V4 <- gsub('"', "", locationTable$V4)
+locationTable$V5 <- gsub('"', "", locationTable$V5)
+
 cat("Saving location table\n")
 save(locationTable, file="data/locationTable.rda")
 return(locationTable)
