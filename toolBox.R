@@ -10,6 +10,8 @@
 #simplify and manipulate the fields
 transmogrifyFrame <- function(dataFrame) {
 
+  source("wordBag.R")
+  library(prettyR)
   library(plyr)
   library(tm)
   library(Snowball)
@@ -32,18 +34,24 @@ transmogrifyFrame <- function(dataFrame) {
   #better column names
   dataFrame$ContractType <- gsub("part_time" , "partTimer", dataFrame$ContractType)   
   dataFrame$ContractType <- gsub("full_time" , "fullTimer", dataFrame$ContractType)
- 
   #leave as words the ContractTime column
- 
+  
+  dataFrame <- cbind(dataFrame[,!(colnames(dataFrame) %in% c("Category", "ContractTime", "ContractType", "LocationNormalized"))], featureBag(dataFrame[,(colnames(dataFrame) %in% c("Category", "ContractTime", "ContractType", "LocationNormalized"))]))
+  
+  #this is where the hard part starts
+  
   dataFrame$Title <- textCleanup(dataFrame$Title, c(stopWords, locWords, redundantWordBag))
   dataFrame$FullDescription <- textCleanup(dataFrame$FullDescription, c(stopWords, locWords, redundantWordBag))
 
   dataFrame$Company <- killPunkSpaces(dataFrame$Company)
   dataFrame$SourceName <- killPunkSpaces(dataFrame$SourceName)
   
-  colnames(dataFrame)[1] <- "SalaryNormalized" #seems to get messed up
+#  cat(c("The company  column has ", length(freq(dataFrame$Company)[[1]]), " unique entries\n"))
+#  cat(c("The source name  column has ", length(freq(dataFrame$SourceName)[[1]]), " unique entries\n"))
+
+  dataFrame <- dataFrame[,!(colnames(dataFrame) %in% c("Title", "FullDescription", "SourceName", "Company"))]
+
   return(dataFrame)
- 
 }#end of transmogrify
 
 #getCategories - word bag the categories
@@ -51,12 +59,7 @@ getWordList <- function(column, find = c(""), replace = c("")){
   if(length(find) > 0 && length(find) == length(replace)){
     for(i in 1:length(find)) {
       column <- gsub(find[i], replace[i], column)
-    } 
-                                        #  column <- gsub("Jobs", "", column)
-                                        #  column <- gsub("&", "", column)
-                                        #  column <- gsub("/", " ", column)
-                                        #  column <- gsub("  ", " ", column)
-  }
+    }}
   if(length(find) != length(replace)){
     cat("Find and replace lengths do not match\n")
   }
@@ -71,13 +74,13 @@ getWordList <- function(column, find = c(""), replace = c("")){
 #specifically alters 
 transmogrifyCategory <- function(column) {
   #I'm turning this into [hopefully] unique identifiers that will make good feature names in columns. And being smartassed.
-  column <- gsub("Accounting & Finance Jobs", "fatCats", column)   #this changes this column to a number for each category
+  column <- gsub("Accounting & Finance Jobs", "fatCats", column)  
   column <- gsub("Admin Jobs", "theMan", column)
   column <- gsub("Charity & Voluntary Jobs", "bleedingHearts", column)
   column <- gsub("Consultancy Jobs", "hiredGuns", column)
   column <- gsub("Creative & Design Jobs", "starvingArtists", column)
   column <- gsub("Customer Services Jobs", "helpDesk", column)
-  column <- gsub("Domestic Help & Cleaning Jobs", "chamberMaids", column)
+  column <- gsub("Domestic Help & Cleaning Jobs", "custodialEngineering", column)
   column <- gsub("Energy, Oil & Gas Jobs", "goJuice", column)
   column <- gsub("Engineering Jobs", "beamMeUpScotty", column)
   column <- gsub("Graduate Jobs", "poorBastards", column)
@@ -186,44 +189,36 @@ textCleanup <- function(column, killWords = c("")) {
   column <- str_trim(column)
   
   return(column)
-}
+}#end of text cleanup
 
-#do all the things to the free text in title and fulldescription, saved from how it was around March 10th, 2013 for reference
-###originalFreeTextHandler #<- function(frame) {
+#get rid of repeated entries in dataset
+killDoppelgangers <- function(frame){
+  clones <- duplicated(frame)
+  clones <- which(clones == TRUE)
+  if(length(clones) < 1){
+    return(frame)
+  }
+  cat(c("There are ", nrow(frame[clones,]), " duplicate entries\n"))
+  return(frame[-clones, ])
+}#end of doppelganger function
 
-#  frame$FullDescription <- paste(frame$FullDescription, frame$Title, sep=" ") #add title to fulldescription
-#  frame$FullDescription <- tolower(frame$FullDescription)   #make it lower case
-  
- # frame$FullDescription <- gsub("[_,\\*]", "", frame$FullDescription)  ##get rid of where they replaced salaries with asterisks.
-  #below gets rid of websites, which I don't think we need to keep, they mess things up
- # frame$FullDescription <- gsub("(((file|gopher|news|nntp|telnet|http|ftp|https|ftps|sftp)://)|(www\\.))+(([a-zA-Z0-9\\._-]+\\.[a-zA-Z]{2,6})|([0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}))(/[a-zA-Z0-9\\&amp;%_\\./-~-]*)?", "", frame$FullDescription)
-  #frame$FullDescription <- gsub("^.*(.com|.co.uk).*$", "", frame$FullDescription)   #destroy british websites
-  #frame$FullDescription <- gsub("/", " ", frame$FullDescription)    #get rid of slashes, confuses things
-  #frame$FullDescription <- gsub("\\.", " ", frame$FullDescription)  #get rid of periods
-  
-  
-  #'%nin%' <- Negate('%in%')
-  #frame$FullDescription <- lapply(frame$FullDescription, function(x) {   
-  #  t <- unlist(strsplit(x, " "))
-  #  t <- t[t %nin% stopWords] ##this gets rid of stopwords i.e., common words like article, simple verbs
-  #  t <- t[t %nin% locWords]#this gets rid of locations
-  #  t <- SnowballStemmer(t)
-  #  t <- paste(t, sep=" ", collapse= " ") 
-  #})
 
-  ##Just stem with tm_map tool in lapply? Maybe even do same lapply
-  ##bagOfHolding <- tm_map(bagOfHolding, stemDocument, language = "english")
+#produce some plots
+analyzer <- function(frame, folder){
+  system(paste(c("mkdir -p ", folder), collapse=""))
+  par(bg = "white")
+  colNames <- colnames(frame)
 
+  for(i in 2:length(colNames)){
+    png(file=paste(c(folder, "/histogram_", colNames[1], "_for_", colNames[i], ".png"), collapse=""), width=800,height=400)
+    hist(frame[(frame[,i]==1),1], main=paste(c(colNames[1], " for ", colNames[i]),collapse=""), xlab=paste(c(colNames[1], " [Pounds] "), collapse=""), ylab="entries",col="red3") 
+  dev.off()
+  }#end of histogram loop
+
+  png(file="hist_salaryDist.png")
+  hist(frame[,1], main="Salary Distribution", xlab=paste(c(colNames[1], " [Pounds] "), collapse=""), ylab="entries",col="cornflowerblue") 
+  dev.off()
   
-  #frame$FullDescription <- gsub("[[:punct:]]", " ", frame$FullDescription)  #kill punctuation, do before following to preserve urls in sourcename
+  graphics.off()
   
-  
-  #frame$FullDescription <- paste(frame$FullDescription, tolower(frame$Company), tolower(frame$SourceName), sep=" ")  #merge text  fields into 1
-  #frame <- frame[,!(colnames(frame) %in% c("Title", "Company","SourceName"))]   #get rid of extra columns
-   
-  #frame$FullDescription <- gsub("\\d", " ", frame$FullDescription)  #get rid of digits
-  #frame$FullDescription <- gsub("/\\s\\s+/", " ", frame$FullDescription) #strip excess white space
-  #frame$FullDescription <- str_trim(frame$FullDescription)
- 
-  #return(frame
-#}#end of freeTextHandler
+}#end of analyzer

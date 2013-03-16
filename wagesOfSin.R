@@ -8,25 +8,47 @@
 ##################################
 
 wagesOfSin <- function() {
+
+  ###########################################################configure
+  nEntries         <- 50000  #number of training entries to run over 
+  proportion       <- 80/100   #split for train and validation
+  samplingSize     <- 10000    #how many events is each tree made of; can save processing memory and time
+  
+  analyzeData      <- TRUE   #run analyzer on data; produces histograms of salary distribution vs word
+  
+  outputLog        <- "logFile.dat"
+   
+  predictionFileRF   <- "test_RF_salaryOutput.csv"
+  
+  ################################################end of configuration
+  sink(outputLog, append=TRUE, split=TRUE)
+  
+  
   library("tm")        #data mining library for nlp
+  library("caret")
   source("toolBox.R")
   source("wordBag.R")
-  
+  source("randomOrchard.R")
+   
   loadSavedTrainData <- FALSE #load training data from saved instead of csv
-
-
-  ###################################################### end config
-
+  loadSavedTestData <- FALSE #load training data from saved instead of csv
+  
+  
   if(loadSavedTrainData == FALSE) {
-    trainFrame <- read.csv("data/Train_rev1.csv", header=TRUE, skip=0, stringsAsFactors=FALSE, nrows=2000)
+    trainFrame <- read.csv("data/Train_rev1.csv", header=TRUE, skip=0, stringsAsFactors=FALSE, nrows=nEntries)
     cat(c(nrow(trainFrame), " rows in this sucker.\n"))
+    
+    
     trainFrame <- trainFrame[,!(colnames(trainFrame) %in% c("Id", "SalaryRaw", "LocationRaw"))] #not keen on these right now, maybe later, 
-
+    
+    trainFrame <- killDoppelgangers(trainFrame) #get rid of duplicate entries
+    
     trainFrame <-cbind(trainFrame$SalaryNormalized, trainFrame[,!(colnames(trainFrame) %in% c("SalaryNormalized"))]) 
     
     trainFrame <- transmogrifyFrame(trainFrame)
-    print(head(trainFrame))
-    
+    colnames(dataFrame)[1] <- "SalaryNormalized" #seems to get messed up
+
+
     save(trainFrame, file="data/table_train.rda")   #save so we can use the smaller version
     cat("Saved training data as R-object\n")    
   }
@@ -36,25 +58,41 @@ wagesOfSin <- function() {
     cat("Loaded\n")
   }
 
+  ####get and configure test data
+  if(loadSavedTestData == FALSE){
+  testFrame <- read.csv("data/Valid_rev1.csv", header=TRUE, skip=0, stringsAsFactors=FALSE)
+  jobIdents <- testFrame[,1] #save job ids for later
+  testFrame <- transmogrifyFrame(testFrame)
+  save(testFrame, jobIdents, file="data/table_test.rda")
+  }
+  if(loadSavedTestData == TRUE) {   #load the saved bit
+    cat("Loading:\n")
+    print(load("data/table_test.rda"))
+    cat("Loaded\n")
+  }
 
-
+   ###########################do some analysis
   
-#print(head(trainFrame))
+   if(analyzeData == TRUE){
+     analyzer(trainFrame, "featurePlots")
+   }
+
+   ######################################split training data into a training set and a performance validation set
+  set.seed(1)
+  splitdex <- createDataPartition(trainFrame[,1], p=proportion, list=FALSE)
+  validationFrame <- trainFrame[-splitdex,]
+  trainFrame <- trainFrame[splitdex, ]
+  cat(c("Training set partitioned into ", nrow(trainFrame), " for training and ", nrow(validationFrame), " for validation\n"))
   
- #gives a vector of words and their frequency in the corpus = all the FullDescription field combined
+   ################################################################## Random Forest 
 
-  ##descriptionBag <- wordBag(trainFrame[,!(colnames(trainFrame) %in% c("ContractType","ContractTime","LocationNormalized","SalarayNormalized"))], "descriptionBag")
-#providing the word bag for analysis... I think doing the hashing trick will be better for constructing features
+  rfModel <- randomOrchard(trainFrame)
 
-#print(trainFrame$Category)
-  
-#empBag <-  wordBag(trainFrame[,!(colnames(trainFrame) %in% c("ContractType","LocationNormalized","FullDescription","Company","ContractTime"))], "descriptionBag")
-#print(empBag)
+  validateOrchard(rfModel, validationFrame)
 
-
-  
-#print(trainFrame$LocationNormalized)
-
-#  
+  orchardOutput <- orchardPredict(rfModel, testFrame, jobIdents)
+  write.csv(results, file=predictionFileRF, row.names=FALSE,quote=FALSE)
+  cat(c("Wrote predictions to file ", predictionFileRF, "\n"))
+    
   return("Stipendium peccati mors est.")
 } #end of wages of sin
