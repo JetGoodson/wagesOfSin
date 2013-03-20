@@ -10,7 +10,7 @@
 wagesOfSin <- function() {
 
   ###########################################################configure
-  nEntries         <- 50000  #number of training entries to run over 
+  nEntries         <- 250000  #number of training entries to run over 
   proportion       <- 80/100   #split for train and validation
   samplingSize     <- 10000    #how many events is each tree made of; can save processing memory and time
   
@@ -19,6 +19,10 @@ wagesOfSin <- function() {
   outputLog        <- "logFile.dat"
    
   predictionFileRF   <- "test_RF_salaryOutput.csv"
+  predictionFileSVM   <- "test_SVM_salaryOutput.csv"
+  
+  loadSavedTrainData <- FALSE #load training data from saved instead of csv
+  loadSavedTestData <- FALSE #load training data from saved instead of csv
   
   ################################################end of configuration
   sink(outputLog, append=TRUE, split=TRUE)
@@ -29,10 +33,9 @@ wagesOfSin <- function() {
   source("toolBox.R")
   source("wordBag.R")
   source("randomOrchard.R")
+  source("cogInTheMachine.R")
    
-  loadSavedTrainData <- FALSE #load training data from saved instead of csv
-  loadSavedTestData <- FALSE #load training data from saved instead of csv
-  
+ 
   
   if(loadSavedTrainData == FALSE) {
     trainFrame <- read.csv("data/Train_rev1.csv", header=TRUE, skip=0, stringsAsFactors=FALSE, nrows=nEntries)
@@ -42,13 +45,23 @@ wagesOfSin <- function() {
     trainFrame <- trainFrame[,!(colnames(trainFrame) %in% c("Id", "SalaryRaw", "LocationRaw"))] #not keen on these right now, maybe later, 
     
     trainFrame <- killDoppelgangers(trainFrame) #get rid of duplicate entries
+
+    
     
     trainFrame <-cbind(trainFrame$SalaryNormalized, trainFrame[,!(colnames(trainFrame) %in% c("SalaryNormalized"))]) 
     
     trainFrame <- transmogrifyFrame(trainFrame)
-    colnames(dataFrame)[1] <- "SalaryNormalized" #seems to get messed up
+     
+    colnames(trainFrame)[1] <- "SalaryNormalized" #seems to get messed up
 
 
+    row.has.na <- apply(trainFrame, 1, function(x){any(is.na(x))})
+    row.has.na2 <- row.has.na[row.has.na == TRUE]
+    cat(c(length(row.has.na2), " number of NA rows\n"))
+    print(head(trainFrame[row.has.na, ]))
+
+  
+    
     save(trainFrame, file="data/table_train.rda")   #save so we can use the smaller version
     cat("Saved training data as R-object\n")    
   }
@@ -91,8 +104,26 @@ wagesOfSin <- function() {
   validateOrchard(rfModel, validationFrame)
 
   orchardOutput <- orchardPredict(rfModel, testFrame, jobIdents)
-  write.csv(results, file=predictionFileRF, row.names=FALSE,quote=FALSE)
+  write.csv(orchardOutput, file=predictionFileRF, row.names=FALSE,quote=FALSE)
   cat(c("Wrote predictions to file ", predictionFileRF, "\n"))
-    
+
+
+  ########################################################### SVM
+
+  #svmModel <- cogInTheMachine(trainFrame)
+
+#  validateSVM(rfModel, validationFrame)
+
+ # svmOutput <- svmPredict(rfModel, testFrame, jobIdents)
+  #write.csv(svmOutput, file=predictionFileSVM, row.names=FALSE,quote=FALSE)
+  #cat(c("Wrote predictions to file ", predictionFileSVM, "\n"))
+
+
+
+
+
+
+
+  
   return("Stipendium peccati mors est.")
 } #end of wages of sin

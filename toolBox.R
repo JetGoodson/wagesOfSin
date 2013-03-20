@@ -37,7 +37,7 @@ transmogrifyFrame <- function(dataFrame) {
   #leave as words the ContractTime column
   
   dataFrame <- cbind(dataFrame[,!(colnames(dataFrame) %in% c("Category", "ContractTime", "ContractType", "LocationNormalized"))], featureBag(dataFrame[,(colnames(dataFrame) %in% c("Category", "ContractTime", "ContractType", "LocationNormalized"))]))
-  
+
   #this is where the hard part starts
   
   dataFrame$Title <- textCleanup(dataFrame$Title, c(stopWords, locWords, redundantWordBag))
@@ -51,6 +51,8 @@ transmogrifyFrame <- function(dataFrame) {
 
   dataFrame <- dataFrame[,!(colnames(dataFrame) %in% c("Title", "FullDescription", "SourceName", "Company"))]
 
+  dataFrame <- dataFrame[,!(colnames(dataFrame) %in% c("nana", "full", "part", "time", "jobs"))] #not sure why these stick around
+  
   return(dataFrame)
 }#end of transmogrify
 
@@ -80,7 +82,8 @@ transmogrifyCategory <- function(column) {
   column <- gsub("Consultancy Jobs", "hiredGuns", column)
   column <- gsub("Creative & Design Jobs", "starvingArtists", column)
   column <- gsub("Customer Services Jobs", "helpDesk", column)
-  column <- gsub("Domestic Help & Cleaning Jobs", "custodialEngineering", column)
+ #column <- gsub("Domestic Help & Cleaning Jobs", "custodialEngineering", column)
+  column <- gsub("Domestic help & Cleaning Jobs", "custodialEngineering", column)
   column <- gsub("Energy, Oil & Gas Jobs", "goJuice", column)
   column <- gsub("Engineering Jobs", "beamMeUpScotty", column)
   column <- gsub("Graduate Jobs", "poorBastards", column)
@@ -98,7 +101,8 @@ transmogrifyCategory <- function(column) {
   column <- gsub("Retail Jobs", "poshShopGirl", column)
   column <- gsub("Sales Jobs", "usedCarSalesmen", column)
   column <- gsub("Scientific & QA Jobs", "madScientists", column)
-  column <- gsub("Social Work Jobs", "busyBodies", column)
+ #column <- gsub("Social Work Jobs", "busyBodies", column)
+  column <- gsub("Social work Jobs", "busyBodies", column)
   column <- gsub("Teaching Jobs", "glorifiedBabysitters", column)
   column <- gsub("Trade & Construction Jobs", "doozers", column)
   column <- gsub("Travel Jobs" , "leavinOnAJetPlane", column)
