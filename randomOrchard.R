@@ -8,20 +8,20 @@
 ##################################
 
 #set up and run random forest
-randomOrchard <- function(trainFrame) {
+randomOrchard <- function(trainFrame, samplingSize = 1000, folds = 2, repetitions = 5, tuneCount = 10, treeCount = 500) {
 
   library("randomForest")
   library("caret")
   library('doMC')
   
-  samplingSize     <- 1000
+  #samplingSize     <- 1000    # these arguments are commented out because I moved them to function arguments
 
   rfMethod         <- "parRF"         #parRF == parallel random forest, in line is just rf
   validationMethod <- "repeatedcv"    #validation method for model
-  folds            <- 2              #number of folds in cv
-  repetitions      <- 5              #repetition for repeatedcv
-  tuneCount        <- 10              #number of tunings for mtry
-  treeCount        <- 500
+ # folds            <- 2              #number of folds in cv
+ # repetitions      <- 1              #repetition for repeatedcv
+ # tuneCount        <- 3              #number of tunings for mtry
+ # treeCount        <- 500
 
   trainController <- trainControl(
     method = validationMethod,

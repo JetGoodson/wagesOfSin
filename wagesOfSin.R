@@ -10,10 +10,16 @@
 wagesOfSin <- function() {
 
   ###########################################################configure
-  nEntries         <- 250000  #number of training entries to run over 
+  nEntries         <- 100000  #number of training entries to run over 
   proportion       <- 80/100   #split for train and validation
-  samplingSize     <- 10000    #how many events is each tree made of; can save processing memory and time
-  
+  samplingSize     <- 1000    #how many events is each tree made of; can save processing memory and time
+
+  freeTextFeatures <- 400
+  numFolds         <- 2
+  numRepeats       <- 5
+  tuneNum          <- 10
+  numTrees         <- 500
+
   analyzeData      <- TRUE   #run analyzer on data; produces histograms of salary distribution vs word
   
   outputLog        <- "logFile.dat"
@@ -30,6 +36,7 @@ wagesOfSin <- function() {
   
   library("tm")        #data mining library for nlp
   library("caret")
+  library("SparseM")
   source("toolBox.R")
   source("wordBag.R")
   source("randomOrchard.R")
@@ -47,18 +54,29 @@ wagesOfSin <- function() {
     trainFrame <- killDoppelgangers(trainFrame) #get rid of duplicate entries
 
     
-    
     trainFrame <-cbind(trainFrame$SalaryNormalized, trainFrame[,!(colnames(trainFrame) %in% c("SalaryNormalized"))]) 
-    
-    trainFrame <- transmogrifyFrame(trainFrame)
+
+  
+    goodWords <- vector()
+    featureListing <- cullFreeText(trainFrame$Title, wordQuota = freeTextFeatures, goodList = goodWords)
+    trainFrame$Title <- featureListing[[1]]
+    goodWords <- featureListing[[2]]
      
+ 
+    trainFrame <- transmogrifyFrame(trainFrame)
+    
+   # print(head(trainFrame))
+
+cat(c("there are ", ncol(trainFrame), " columns now\n"))
+    
     colnames(trainFrame)[1] <- "SalaryNormalized" #seems to get messed up
 
-
-    row.has.na <- apply(trainFrame, 1, function(x){any(is.na(x))})
-    row.has.na2 <- row.has.na[row.has.na == TRUE]
-    cat(c(length(row.has.na2), " number of NA rows\n"))
-    print(head(trainFrame[row.has.na, ]))
+    trainFrame[is.na(trainFrame)] <- 0  #they seem to pop up - memory issue?
+    
+   # row.has.na <- apply(trainFrame, 1, function(x){any(is.na(x))})
+   # row.has.na2 <- row.has.na[row.has.na == TRUE]
+   # cat(c(length(row.has.na2), " number of NA rows\n"))
+   # print(head(trainFrame[row.has.na, ]))
 
   
     
@@ -75,7 +93,11 @@ wagesOfSin <- function() {
   if(loadSavedTestData == FALSE){
   testFrame <- read.csv("data/Valid_rev1.csv", header=TRUE, skip=0, stringsAsFactors=FALSE)
   jobIdents <- testFrame[,1] #save job ids for later
+
+  testFrame$Title <- cullFreeText(testFrame$Title, goodList = goodWords)[[1]]
   testFrame <- transmogrifyFrame(testFrame)
+  testFrame[is.na(testFrame)] <- 0  #they seem to pop up - memory issue?
+    
   save(testFrame, jobIdents, file="data/table_test.rda")
   }
   if(loadSavedTestData == TRUE) {   #load the saved bit
@@ -98,9 +120,13 @@ wagesOfSin <- function() {
   cat(c("Training set partitioned into ", nrow(trainFrame), " for training and ", nrow(validationFrame), " for validation\n"))
   
    ################################################################## Random Forest 
-
-  rfModel <- randomOrchard(trainFrame)
-
+ 
+  rfModel <- randomOrchard(trainFrame,
+                           folds=numFolds,
+                           repetitions=numRepeats,
+                           tuneCount = tuneNum,
+                           treeCount = numTrees)
+  
   validateOrchard(rfModel, validationFrame)
 
   orchardOutput <- orchardPredict(rfModel, testFrame, jobIdents)
@@ -110,18 +136,14 @@ wagesOfSin <- function() {
 
   ########################################################### SVM
 
-  #svmModel <- cogInTheMachine(trainFrame)
+#  svmModel <- cogInTheMachine(trainFrame)
 
-#  validateSVM(rfModel, validationFrame)
+ # validateSVM(rfModel, validationFrame)
 
- # svmOutput <- svmPredict(rfModel, testFrame, jobIdents)
+
+  #svmOutput <- svmPredict(rfModel, testFrame, jobIdents)
   #write.csv(svmOutput, file=predictionFileSVM, row.names=FALSE,quote=FALSE)
   #cat(c("Wrote predictions to file ", predictionFileSVM, "\n"))
-
-
-
-
-
 
 
   

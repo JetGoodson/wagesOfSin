@@ -35,12 +35,13 @@ transmogrifyFrame <- function(dataFrame) {
   dataFrame$ContractType <- gsub("part_time" , "partTimer", dataFrame$ContractType)   
   dataFrame$ContractType <- gsub("full_time" , "fullTimer", dataFrame$ContractType)
   #leave as words the ContractTime column
-  
-  dataFrame <- cbind(dataFrame[,!(colnames(dataFrame) %in% c("Category", "ContractTime", "ContractType", "LocationNormalized"))], featureBag(dataFrame[,(colnames(dataFrame) %in% c("Category", "ContractTime", "ContractType", "LocationNormalized"))]))
+
+ 
+  dataFrame <- cbind(dataFrame[,!(colnames(dataFrame) %in% c("Title", "Category", "ContractTime", "ContractType", "LocationNormalized"))], featureBag(dataFrame[,(colnames(dataFrame) %in% c("Title", "Category", "ContractTime", "ContractType", "LocationNormalized"))]))
 
   #this is where the hard part starts
   
-  dataFrame$Title <- textCleanup(dataFrame$Title, c(stopWords, locWords, redundantWordBag))
+  #dataFrame$Title <- textCleanup(dataFrame$Title, c(stopWords, locWords, redundantWordBag))
   dataFrame$FullDescription <- textCleanup(dataFrame$FullDescription, c(stopWords, locWords, redundantWordBag))
 
   dataFrame$Company <- killPunkSpaces(dataFrame$Company)
@@ -49,7 +50,7 @@ transmogrifyFrame <- function(dataFrame) {
 #  cat(c("The company  column has ", length(freq(dataFrame$Company)[[1]]), " unique entries\n"))
 #  cat(c("The source name  column has ", length(freq(dataFrame$SourceName)[[1]]), " unique entries\n"))
 
-  dataFrame <- dataFrame[,!(colnames(dataFrame) %in% c("Title", "FullDescription", "SourceName", "Company"))]
+  dataFrame <- dataFrame[,!(colnames(dataFrame) %in% c("FullDescription", "SourceName", "Company"))]
 
   dataFrame <- dataFrame[,!(colnames(dataFrame) %in% c("nana", "full", "part", "time", "jobs"))] #not sure why these stick around
   
@@ -226,3 +227,128 @@ analyzer <- function(frame, folder){
   graphics.off()
   
 }#end of analyzer
+
+
+#function to pre-process free text (title and fulldescription) for feature creation by eliminating least common words
+cullFreeText <- function(column, wordQuota = 400, goodList = vector(), folder="wordPlots", doPlots=FALSE){
+
+  system(paste(c("mkdir -p ", folder), collapse=""))
+  
+  library('plyr')
+  library(Snowball)
+  require(stringr)
+  load(file="data/locationWordBag.rda")#gives locWords
+  stopWords <- stopwords("en")
+  class(stopWords)
+  
+  column <- tolower(column)   #make it lower case
+  
+  '%nin%' <- Negate('%in%')
+  column <- sapply(column, function(x) {   
+    t <- unlist(strsplit(x, " "))
+    t <- t[t %nin% locWords]#this gets rid of locations
+    t <- paste(t, sep=" ", collapse= " ") 
+  })
+  
+  column <- gsub("\\+\\+", "plusplus", column)    #want to preserve C skills when 
+  column <- gsub("\\#", "sharp", column)          #we kill special characters
+  column <- gsub("c/c", "ceecee", column)    
+  
+  column <- gsub("/", " ", column)    #get rid of slashes, confuses things
+  column <- gsub("\\.", " ", column)  #get rid of periods
+  column <- gsub("\\d", "", column)
+  column <- gsub("/\\s\\s+/", " ", column) #strip excess white space
+  
+  '%nin%' <- Negate('%in%')
+  column <- sapply(column, function(x) {   
+    t <- unlist(strsplit(x, " "))
+    t <- t[t %nin% stopWords] ##this gets rid of stopwords i.e., common words like article, simple verbs
+    t <- SnowballStemmer(t)
+    t <- unique(t)
+    t <- paste(t, sep=" ", collapse= " ") 
+  })
+  
+  column <- gsub("[[:punct:]]", " ", column)  #kill punctuation, do before following to preserve urls in sourcename
+  column <- gsub("\\b[a-zA-Z0-9]{1,2}\\b", "", column) #remove single characters
+  column <- gsub("/\\s\\s+/", " ", column) #strip excess white space
+  
+  
+  wordList <- sapply(column, function(x) {
+    t <- unlist(strsplit(x, " ")) 
+  })
+  
+  wordList <- unlist(wordList)
+  freqWords <- sort(table(wordList), decreasing=TRUE)
+  
+  if(doPlots == TRUE){
+  png(file=paste(c(folder, "/", "hist_unstructTextWordFrequencies_High.png"), collapse=""))
+  hist(freqWords[freqWords > 5000], main = "freq > 5000 Occurances", col="cornflowerblue")
+  dev.off()
+  
+  
+  png(file=paste(c(folder, "/", "hist_unstructTextWordFrequencies_Low.png"), collapse=""))
+  hist(freqWords[freqWords < 5000], main = "Freq < 5000 Occurances", col="cornflowerblue")
+  dev.off()
+  
+  png(file=paste(c(folder, "/", "hist_unstructTextWordFrequencies_ReallyLow.png"), collapse=""))
+  hist(freqWords[freqWords < 1000], main = "Freq < 1000 Occurances", col="cornflowerblue")
+  dev.off()
+  
+  png(file=paste(c(folder, "/", "hist_unstructTextWordFrequencies_ReallyVeryLow.png"), collapse=""))
+  hist(freqWords[freqWords < 100], main = "Freq < 100 Occurances", col="cornflowerblue")
+  dev.off()
+  
+  png(file=paste(c(folder, "/", "hist_unstructTextWordFrequencies.png"), collapse=""))
+  hist(freqWords[-1], main = "Word count, All Freq", col="cornflowerblue", breaks=c(0,1,10,100,1000,5000,10000,15000,20000,25000,50000,100000))
+  dev.off()
+  
+  png(file=paste(c(folder, "/", "hist_unstructTextWordFrequencies_firstHundred.png"), collapse=""))
+  hist(freqWords[2:(wordQuota+1)], main = "Freq of Quota Most Common Words", col="cornflowerblue")
+  dev.off()
+  
+  png(file=paste(c(folder, "/", "hist_unstructTextWordFrequencies_ThousandBreaks.png"), collapse=""))
+  hist(freqWords[-1], main = "Word Count, All Freq (1000 bins)", col="cornflowerblue", breaks=1000)
+  dev.off()
+  
+
+  png(file=paste(c(folder, "/", "hist_unstructTextWordFrequencies_handfuls.png"), collapse=""))
+  hist(freqWords[freqWords < 10], main = "Freq < 10 Occurances", col="cornflowerblue")
+  dev.off()
+}
+
+ 
+  if(length(goodList) > 0){
+    killList <- rownames(freqWords)
+    killList <- setdiff(killList, goodList)
+  }
+
+  if(length(goodList) == 0){
+    killList <- rownames(freqWords[(wordQuota+2):length(freqWords)])
+    killList <- sort(unique(killList))
+    goodList <- rownames(freqWords[2:(wordQuota+1)])
+  }
+  
+  '%nin%' <- Negate('%in%')
+  column <- sapply(column, function(x) {   
+    t <- unlist(strsplit(x, " "))
+    t <- t[t %nin% killList]#this gets rid of locations
+    t <- paste(t, sep=" ", collapse= " ") 
+  })
+
+  column <- gsub("/\\s\\s+/", " ", column) #strip excess white space -- it's persistent
+
+  return(list(column, goodList))
+  
+}#end of pretreat text
+
+
+#gets a SparseM sparse matrix from a data frame
+getSparse <- function(dataFrame) {
+    tmpMat <- as.matrix(dataFrame)
+    sparseMat <- as.matrix.csr(tmpMat)
+    rm(tmpMat)
+    return(sparseMat)
+} #end of getSparse
+
+
+

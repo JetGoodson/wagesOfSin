@@ -12,6 +12,11 @@
 cogInTheMachine <- function(dataset){
  library(e1071)
  library(sprint)
+ library(SparseM)
+ 
+ splitem <- createDataPartition(dataset[,1], p=(10/100), list=FALSE)
+ dataset <- getSparse(dataset)
+
  
  if ( require("multicore", quietly = FALSE, warn.conflicts = TRUE) ) {
   # trainController$workers <- multicore:::detectCores()
@@ -27,7 +32,7 @@ cogInTheMachine <- function(dataset){
  bestCost = 5
 
 
- tuned <- tuneMachine(dataset, gams=10^{-2:0}, costs=10^{-1:2}, degs=2:4)
+ tuned <- tuneMachine(dataset[splitem,], gams=10^{-2:0}, costs=10^{-1:1}, degs=2:3)
  print(tuned$best.parameters)
  bestPoly <- 2
  bestGamma <- tuned$best.parameters[[1]]
@@ -46,6 +51,7 @@ cogInTheMachine <- function(dataset){
 tuneMachine <-function(dataset, gams, costs, degs) {
   library(e1071)
   library(sprint)
+  
 
   cat("Tuning on ", nrow(dataset), " events\n")
   
@@ -63,6 +69,8 @@ validateSVM <- function(model, validationData) {
   library("randomForest")
   library("caret")
 
+  validationData <- getSparse(validationData)
+  
   validate <-predict(model, validationData[,-1])
   cat("SVM Predicted head: \n")
   print(head(validate))

@@ -42,7 +42,7 @@ makeTextFile <- function(input, textFile){
 
 
 #function to take a dataframe of key words and turn the key words into features.
-featureBag <- function(frame) {
+featureBag <- function(frame, killStops = FALSE) {
   library('tm') 
   library('doMC')
   library('plyr')
@@ -54,7 +54,7 @@ featureBag <- function(frame) {
   
   freqMat <- data.frame()
   
-  split <- 50000
+  split <- 25000
   max <- nrow(frame)
   lows <- seq(1, max, by=split)
   highs <- vector()
@@ -66,20 +66,24 @@ featureBag <- function(frame) {
   }
     
   maxIt <- 1 + as.integer((nrow(frame) - 1)/split)
-  print(maxIt)
-  print(lows)
-  print(highs)
  
   freqMat <- foreach(v = 1:maxIt, .combine=rbind.fill) %dopar% {
     cat(c("Word bag", v, " starting on", lows[v], " to ", highs[v], "\n"))
     wordBag <- Corpus(DataframeSource(frame[lows[v]:highs[v],]))
+    if(killStops == TRUE){
+      wordBag <- tm_map(wordBag, removeNumbers)
+      wordBag <- tm_map(wordBag, removePunctuation)
+      wordBag <- tm_map(wordBag, stripWhitespace)
+      wordBag <- tm_map(wordBag, tolower)
+      wordBag <- tm_map(wordBag, removeWords, stopwords("english"))
+    }
     wordBag <- TermDocumentMatrix(wordBag)
     wordBag <- as.matrix(wordBag)
     cat(c("Word bag", v, " finished\n"))
     wordBag <- t(wordBag)
     wordBag <- as.data.frame(wordBag)
-   # print(head(wordBag))
   }#end of foreach loop
 
   return(freqMat)
 }#end of feature bag
+
